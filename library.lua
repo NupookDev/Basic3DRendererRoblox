@@ -6,14 +6,10 @@ module.dot3D = function(vertex0: { number }, vertex1: { number }): number
 	return (vertex0[1] * vertex1[1]) + (vertex0[2] * vertex1[2]) + (vertex0[3] * vertex1[3])
 end
 
-module.cross = function(vertex0: { number }, vertex1: { number }): { number }
-	local result = {}
-	
+module.cross = function(result: { number }, vertex0: { number }, vertex1: { number })
 	result[1] = (vertex0[2] * vertex1[3]) - (vertex1[2] * vertex0[3])
 	result[2] = (vertex0[1] * vertex1[3]) - (vertex1[1] * vertex0[3])
 	result[3] = (vertex0[1] * vertex1[2]) - (vertex1[1] * vertex0[2])
-	
-	return result
 end
 
 module.multiplyMatrix = function(matrix0: { { number } }, matrix1: { { number } })
