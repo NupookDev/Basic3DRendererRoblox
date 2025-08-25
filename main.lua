@@ -1,3 +1,7 @@
+local game = game
+local workspace = workspace
+local Enum = Enum
+
 local newVector = Vector3.new
 local sin, cos, floor, round = math.sin, math.cos, math.floor, math.round
 local fromRGB = Color3.fromRGB
@@ -7,12 +11,17 @@ local getTick = tick
 local yield = task.wait
 
 local library = require(game:GetService("ReplicatedStorage").Library)
+local dot3D = library.dot3D
+local cross = library.cross
+local multiplyMatrix = library.multiplyMatrix
+local rotateVertex = library.rotateVertex
+local normalize3D = library.normalize3D
+local createBox = library.createBox
 
 local WIDTH = 320
 local HEIGHT = 180
 
 local SIZE = newVector(0.5, 0.5, 0.5)
-local SMOOTH_PLASTIC = Enum.Material.SmoothPlastic
 local BLACK = fromRGB(0, 0, 0)
 
 local HUGE = math.huge
@@ -26,9 +35,12 @@ local function putPixel(x: number, y: number, color: { number }, l: number)
 	pixels[x + 1][y + 1].Color = fromRGB(color[1] * l, color[2] * l, color[3] * l)
 end
 
-local function getTexturePixel(texture: {}, u: number, v: number): { number }
+local function getTexturePixel(result: { number }, texture: {}, u: number, v: number): { number }
 	local xy = (round(u * (texture.size[1] - 1)) + (round(v * (texture.size[2] - 1)) * texture.size[1])) * 3
-	return { readu8(texture.data, xy), readu8(texture.data, xy + 1), readu8(texture.data, xy + 2) }
+	
+	result[1] = readu8(texture.data, xy)
+	result[2] = readu8(texture.data, xy + 1)
+	result[3] = readu8(texture.data, xy + 2)
 end
 
 local lightDirection = { -sin(0.79), cos(0.79), 0 }
@@ -99,12 +111,14 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 	end
 	
 	local vertex0, vertex1, vertex2 = worldSpace[1], worldSpace[2], worldSpace[3]
-
-	local crossProduct = library.cross({ vertex1[1] - vertex0[1], vertex1[2] - vertex0[2], vertex1[3] - vertex0[3] }, { vertex2[1] - vertex0[1], vertex2[2] - vertex0[2], vertex2[3] - vertex0[3] })
+	local crossProduct = {}
+	
+	cross(crossProduct, { vertex1[1] - vertex0[1], vertex1[2] - vertex0[2], vertex1[3] - vertex0[3] }, { vertex2[1] - vertex0[1], vertex2[2] - vertex0[2], vertex2[3] - vertex0[3] })
+	
 	local lightDot
 	
-	if library.normalize3D(crossProduct) == 1 then
-		lightDot = library.dot3D(crossProduct, lightDirection)
+	if normalize3D(crossProduct) == 1 then
+		lightDot = dot3D(crossProduct, lightDirection)
 
 		if lightDot < 0 then
 			lightDot = -lightDot
@@ -128,6 +142,7 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 		local ut, vt
 		local perspectiveWInv
 		local perspectiveU, perspectiveV, perspectiveW
+		local texturePixel = {}
 		
 		for y = yMin, yMax, 1 do
 			for x = xMin, xMax, 1 do
@@ -163,8 +178,9 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 
 				ut = ((perspectiveU * UVCoords[1][1]) + (perspectiveV * UVCoords[2][1]) + (perspectiveW * UVCoords[3][1])) * perspectiveWInv
 				vt = ((perspectiveU * UVCoords[1][2]) + (perspectiveV * UVCoords[2][2]) + (perspectiveW * UVCoords[3][2])) * perspectiveWInv
-
-				putPixel(x, y, getTexturePixel(texture, ut, vt), lightDot)
+				
+				getTexturePixel(texturePixel, texture, ut, vt)
+				putPixel(x, y, texturePixel, lightDot)
 			end
 		end
 		
@@ -272,7 +288,7 @@ local function renderObjects() --very important fucntion
 			vertex[2] = object.verticies[i][2]
 			vertex[3] = object.verticies[i][3]
 			
-			library.rotateVertex(vertex, object.rotation)
+			rotateVertex(vertex, object.rotation)
 			vertex[1] += object.position[1]
 			vertex[2] += object.position[2]
 			vertex[3] += object.position[3]
@@ -282,9 +298,9 @@ local function renderObjects() --very important fucntion
 			vertex[1] -= camera.position[1]
 			vertex[2] -= camera.position[2]
 			vertex[3] -= camera.position[3]
-			library.rotateVertex(vertex, transposedRotation)
+			rotateVertex(vertex, transposedRotation)
 			
-			if vertex[3] >= 0 then
+			if vertex[3] >= -2 then
 				projected[i] = 0
 				continue
 			end
@@ -317,7 +333,7 @@ local function renderObjects() --very important fucntion
 end
 
 local function createBoxWithPosition(position: { number }, size: { number })
-	local box = library.createBox(size)
+	local box = createBox(size)
 	
 	box.position[1] = position[1]
 	box.position[2] = position[2]
@@ -334,25 +350,30 @@ end
 
 --MAIN
 
-objects[2] = library.createBox({ 2, 2, 2 })
+objects[2] = createBox({ 2, 2, 2 })
 objects[2].texture = testTexture
 
-local skinColor = { 245, 205, 48 }
-local legColor = { 164, 189, 71 }
+--TEST--
+do
+	local skinColor = { 245, 205, 48 }
+	local legColor = { 164, 189, 71 }
 
-objects[3] = createBoxWithPosition({ 10, 1.5, 0 }, { 1, 1, 1 })
-setColor(objects[3], skinColor)
-objects[4] = createBoxWithPosition({ 10, 0, 0 }, { 2, 2, 1 })
-setColor(objects[4], { 13, 105, 172 })
-objects[5] = createBoxWithPosition({ 11.5, 0, 0 }, { 1, 2, 1 })
-setColor(objects[5], skinColor)
-objects[6] = createBoxWithPosition({ 8.5, 0, 0 }, { 1, 2, 1 })
-setColor(objects[6], skinColor)
-objects[7] = createBoxWithPosition({ 10.5, -2, 0 }, { 1, 2, 1 })
-setColor(objects[7], legColor)
-objects[8] = createBoxWithPosition({ 9.5, -2, 0 }, { 1, 2, 1 })
-setColor(objects[8], legColor)
+	objects[3] = createBoxWithPosition({ 10, 1.5, 0 }, { 1, 1, 1 })
+	setColor(objects[3], skinColor)
+	objects[4] = createBoxWithPosition({ 10, 0, 0 }, { 2, 2, 1 })
+	setColor(objects[4], { 13, 105, 172 })
+	objects[5] = createBoxWithPosition({ 11.5, 0, 0 }, { 1, 2, 1 })
+	setColor(objects[5], skinColor)
+	objects[6] = createBoxWithPosition({ 8.5, 0, 0 }, { 1, 2, 1 })
+	setColor(objects[6], skinColor)
+	objects[7] = createBoxWithPosition({ 10.5, -2, 0 }, { 1, 2, 1 })
+	setColor(objects[7], legColor)
+	objects[8] = createBoxWithPosition({ 9.5, -2, 0 }, { 1, 2, 1 })
+	setColor(objects[8], legColor)
+end
+--END--
 
+--TEST--
 do
 	local smile = {
 		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -382,33 +403,32 @@ do
 		end
 	end
 end
+--END--
 
-do
-	local pixelFolder = newInstance("Folder")
-	
-	pixelFolder.Name = "PixelFolder"
-	pixelFolder.Parent = workspace
-	
-	local part
+local pixelFolder = newInstance("Folder")
 
-	for x = 1, WIDTH, 1 do
-		pixels[x] = {}
-		zBuffer[x] = {}
+pixelFolder.Name = "PixelFolder"
+pixelFolder.Parent = workspace
 
-		for y = 1, HEIGHT, 1 do
-			part = newInstance("Part")
-			part.Anchored = true
-			part.CanCollide = false
-			part.CanTouch = false
-			part.Size = SIZE
-			part.Position = newVector(x * 0.5, (HEIGHT - y) * 0.5, 0)
-			part.Parent = pixelFolder
-			part.Name = ""..x..":"..y
-			part.CastShadow = false
-			part.Material = SMOOTH_PLASTIC
-			pixels[x][y] = part
-			zBuffer[x][y] = HUGE
-		end
+local part
+
+for x = 1, WIDTH, 1 do
+	pixels[x] = {}
+	zBuffer[x] = {}
+
+	for y = 1, HEIGHT, 1 do
+		part = newInstance("Part")
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.Size = SIZE
+		part.Position = newVector(x * 0.5, (HEIGHT - y) * 0.5, 0)
+		part.Parent = pixelFolder
+		part.Name = ""..x..":"..y
+		part.CastShadow = false
+		part.Material = Enum.Material.SmoothPlastic
+		pixels[x][y] = part
+		zBuffer[x][y] = HUGE
 	end
 end
 
@@ -497,8 +517,8 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 			moveDirection[2] -= 1
 		end
 		
-		if library.normalize3D(moveDirection) == 1 then
-			library.rotateVertex(moveDirection, camera.rotation)
+		if normalize3D(moveDirection) == 1 then
+			rotateVertex(moveDirection, camera.rotation)
 
 			local moveDelta
 
@@ -519,7 +539,7 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 		local totalRotation = 0.78 * deltaTime
 		local sinY, cosY = sin(totalRotation), cos(totalRotation)
 		
-		library.multiplyMatrix(objects[1].rotation, {
+		multiplyMatrix(objects[1].rotation, {
 			{ cosY, 0, -sinY },
 			{ 0, 1, 0 },
 			{ sinY, 0, cosY }
@@ -551,8 +571,8 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 			pyramidMove[2] -= 1
 		end
 		
-		if library.normalize3D(pyramidMove) == 1 then
-			library.rotateVertex(pyramidMove, camera.rotation)
+		if normalize3D(pyramidMove) == 1 then
+			rotateVertex(pyramidMove, camera.rotation)
 			
 			local moveDelta = deltaTime * 3
 			
@@ -561,6 +581,7 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 			objects[1].position[3] += pyramidMove[3] * moveDelta
 		end
 	end
+	--END--
 		
 	renderObjects()
 end)
