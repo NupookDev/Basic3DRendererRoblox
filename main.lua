@@ -21,9 +21,6 @@ local createBox = library.createBox
 local WIDTH = 320
 local HEIGHT = 180
 
-local SIZE = newVector(0.5, 0.5, 0.5)
-local BLACK = fromRGB(0, 0, 0)
-
 local HUGE = math.huge
 local HALF_PI = math.pi * 0.5
 local ASPECT_RATIO_INV = 1 / (WIDTH / HEIGHT)
@@ -274,14 +271,16 @@ local function renderObjects() --very important fucntion
 	
 	local object	
 	local face
-	local projected
-	local worldSpace
-	local wInv
+	local projected = {}
+	local worldSpace = {}
 	local vertex = {}
+	local wInv
+	local projectedPoints = {}
+	local uvPoints = {}
+	local worldSpacePoints = {}
 	
 	for i = 1, #objects, 1 do
 		object = objects[i]
-		projected, worldSpace = {}, {}
 		
 		for i = 1, #object.verticies, 1 do
 			vertex[1] = object.verticies[i][1]
@@ -321,10 +320,22 @@ local function renderObjects() --very important fucntion
 				continue
 			end
 			
+			projectedPoints[1] = projected[face[1]]
+			projectedPoints[2] = projected[face[2]]
+			projectedPoints[3] = projected[face[3]]
+			
+			uvPoints[1] = object.uv[face[4]]
+			uvPoints[2] = object.uv[face[5]]
+			uvPoints[3] = object.uv[face[6]]
+			
+			worldSpacePoints[1] = worldSpace[face[1]]
+			worldSpacePoints[2] = worldSpace[face[2]]
+			worldSpacePoints[3] = worldSpace[face[3]]
+			
 			drawTriangle(
-				{ projected[face[1]], projected[face[2]], projected[face[3]] },
-				{ object.uv[face[4]], object.uv[face[5]], object.uv[face[6]] },
-				{ worldSpace[face[1]], worldSpace[face[2]], worldSpace[face[3]] },
+				projectedPoints,
+				uvPoints,
+				worldSpacePoints,
 				object.texture,
 				object.color
 			)
@@ -410,6 +421,7 @@ local pixelFolder = newInstance("Folder")
 pixelFolder.Name = "PixelFolder"
 pixelFolder.Parent = workspace
 
+local partSize = newVector(0.5, 0.5, 0.5)
 local part
 
 for x = 1, WIDTH, 1 do
@@ -421,7 +433,7 @@ for x = 1, WIDTH, 1 do
 		part.Anchored = true
 		part.CanCollide = false
 		part.CanTouch = false
-		part.Size = SIZE
+		part.Size = partSize
 		part.Position = newVector(x * 0.5, (HEIGHT - y) * 0.5, 0)
 		part.Parent = pixelFolder
 		part.Name = ""..x..":"..y
@@ -442,12 +454,13 @@ end
 local userInputService = game:GetService("UserInputService")
 local screenMode = 0
 local workspaceCamera = workspace.Camera
+local z100studs = newVector(0, 0, 100)
 
 userInputService.InputBegan:Connect(function(input: InputObject)
 	if input.KeyCode == Enum.KeyCode.Z and userInputService:GetFocusedTextBox() == nil then
 		if screenMode == 0 then
 			workspaceCamera.CameraType = Enum.CameraType.Scriptable
-			workspaceCamera.CFrame = (pixels[WIDTH * 0.5][HEIGHT * 0.5].CFrame) + newVector(0, 0, 100)
+			workspaceCamera.CFrame = (pixels[round(WIDTH * 0.5)][round(HEIGHT * 0.5)].CFrame) + z100studs
 			userInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 			userInputService.MouseIconEnabled = false
 			screenMode = 1
@@ -460,12 +473,13 @@ userInputService.InputBegan:Connect(function(input: InputObject)
 	end
 end)
 
+local blackColor = fromRGB(0, 0, 0)
 local angleX, angleY = 0, 0
 
 runService.RenderStepped:Connect(function(deltaTime: number)
 	for x = 1, WIDTH, 1 do --clear screen
 		for y = 1, HEIGHT, 1 do
-			pixels[x][y].Color = BLACK
+			pixels[x][y].Color = blackColor
 			zBuffer[x][y] = HUGE
 		end
 	end
