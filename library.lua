@@ -95,4 +95,38 @@ module.createBox = function(size: { number }): {}
 	}
 end
 
+module.computeBarry = function(result: { number }, matrix: { { number } }): number --echelon form
+	local a, b = matrix[1][1], matrix[1][2]
+	local c, d = matrix[2][1], matrix[2][2]
+	
+	local det = (a * d) - (c * b)
+	
+	if det == 0 then
+		return 0
+	end
+	
+	local detInv = 1 / det
+	local e, f = matrix[1][3], matrix[2][3]
+	
+	result.v = ((a * f) - (c * e)) * detInv
+	
+	if result.v < 0 then
+		return 0
+	end
+	
+	result.u = ((d * e) - (b * f)) * detInv
+	
+	if result.u < 0 then
+		return 0
+	end
+	
+	result.w = 1 - result.u - result.v
+	
+	if result.w < 0 then
+		return 0
+	end
+	
+	return 1
+end
+
 return module
