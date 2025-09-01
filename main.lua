@@ -17,6 +17,7 @@ local multiplyMatrix = library.multiplyMatrix
 local rotateVertex = library.rotateVertex
 local normalize3D = library.normalize3D
 local createBox = library.createBox
+local computeBarry = library.computeBarry
 
 local WIDTH = 320
 local HEIGHT = 180
@@ -128,53 +129,46 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 	
 	vertex0, vertex1, vertex2 = projected[1], projected[2], projected[3]
 	
-	local a, b = vertex0[1] - vertex2[1], vertex1[1] - vertex2[1]
-	local c, d = vertex0[2] - vertex2[2], vertex1[2] - vertex2[2]
-	local e, f
-	local det, detInv
-	local u, v, w
+	local barryMatrix = { {}, {} }
+	
+	barryMatrix[1][1], barryMatrix[1][2] = vertex0[1] - vertex2[1], vertex1[1] - vertex2[1]
+	barryMatrix[2][1], barryMatrix[2][2] = vertex0[2] - vertex2[2], vertex1[2] - vertex2[2]
+	
+	local barryResult = {}
 	local z
+	local luaX, luaY
 	
 	if texture then
 		local ut, vt
-		local perspectiveWInv
+		local perspectiveCorrectW
 		local perspectiveU, perspectiveV, perspectiveW
 		local texturePixel = {}
 		
 		for y = yMin, yMax, 1 do
 			for x = xMin, xMax, 1 do
-				e, f = x - vertex2[1], y - vertex2[2]
-				det = (a * d) - (c * b)
-
-				if det == 0 then
-					continue
-				end
-
-				detInv = 1 / det
-
-				v = ((a * f) - (c * e)) * detInv
-				u = ((d * e) - (b * f)) * detInv
-				w = 1 - u - v
+				barryMatrix[1][3], barryMatrix[2][3] = x - vertex2[1], y - vertex2[2]
 				
-				if u < 0 or v < 0 or w < 0 then
+				if computeBarry(barryResult, barryMatrix) == 0 then
 					continue
 				end
 				
-				perspectiveWInv = 1 / ((u * vertex0[3]) + (v * vertex1[3]) + (w * vertex2[3]))
-				z = (u + v + w) * perspectiveWInv
+				perspectiveCorrectW = 1 / ((barryResult.u * vertex0[3]) + (barryResult.v * vertex1[3]) + (barryResult.w * vertex2[3]))
+				z = (barryResult.u + barryResult.v + barryResult.w) * perspectiveCorrectW
 				
-				if z >= zBuffer[x + 1][y + 1] then
+				luaX, luaY = x + 1, y + 1
+				
+				if z >= zBuffer[luaX][luaY] then
 					continue
 				end
 				
-				zBuffer[x + 1][y + 1] = z
+				zBuffer[luaX][luaY] = z
 				
-				perspectiveU = u * vertex0[3]
-				perspectiveV = v * vertex1[3]
-				perspectiveW = w * vertex2[3]
+				perspectiveU = barryResult.u * vertex0[3]
+				perspectiveV = barryResult.v * vertex1[3]
+				perspectiveW = barryResult.w * vertex2[3]
 
-				ut = ((perspectiveU * UVCoords[1][1]) + (perspectiveV * UVCoords[2][1]) + (perspectiveW * UVCoords[3][1])) * perspectiveWInv
-				vt = ((perspectiveU * UVCoords[1][2]) + (perspectiveV * UVCoords[2][2]) + (perspectiveW * UVCoords[3][2])) * perspectiveWInv
+				ut = ((perspectiveU * UVCoords[1][1]) + (perspectiveV * UVCoords[2][1]) + (perspectiveW * UVCoords[3][1])) * perspectiveCorrectW
+				vt = ((perspectiveU * UVCoords[1][2]) + (perspectiveV * UVCoords[2][2]) + (perspectiveW * UVCoords[3][2])) * perspectiveCorrectW
 				
 				getTexturePixel(texturePixel, texture, ut, vt)
 				putPixel(x, y, texturePixel, lightDot)
@@ -186,31 +180,22 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 	
 	for y = yMin, yMax, 1 do
 		for x = xMin, xMax, 1 do
-			e, f = x - vertex2[1], y - vertex2[2]
-			det = (a * d) - (c * b)
-			
-			if det == 0 then
+			barryMatrix[1][3], barryMatrix[2][3] = x - vertex2[1], y - vertex2[2]
+
+			if computeBarry(barryResult, barryMatrix) == 0 then
 				continue
 			end
-			
-			detInv = 1 / det
-			
-			v = ((a * f) - (c * e)) * detInv
-			u = ((d * e) - (b * f)) * detInv
-			w = 1 - u - v
-			
-			if u < 0 or v < 0 or w < 0 then
+
+			z = (barryResult.u + barryResult.v + barryResult.w) / ((barryResult.u * vertex0[3]) + (barryResult.v * vertex1[3]) + (barryResult.w * vertex2[3]))
+
+			luaX, luaY = x + 1, y + 1
+
+			if z >= zBuffer[luaX][luaY] then
 				continue
 			end
-			
-			z = (u + v + w) / ((u * vertex0[3]) + (v * vertex1[3]) + (w * vertex2[3]))
-			
-			if z >= zBuffer[x + 1][y + 1] then
-				continue
-			end
-			
-			zBuffer[x + 1][y + 1] = z
-			
+
+			zBuffer[luaX][luaY] = z
+
 			putPixel(x, y, color, lightDot)
 		end
 	end
