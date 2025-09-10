@@ -6,21 +6,26 @@ local newVector = Vector3.new
 local sin, cos, floor, round = math.sin, math.cos, math.floor, math.round
 local fromRGB = Color3.fromRGB
 local newInstance = Instance.new
-local createBuffer, writeu8, readu8 = buffer.create, buffer.writeu8, buffer.readu8
-local getTick = tick
+local readu8 = buffer.readu8
+local osClock = os.clock
 local yield = task.wait
+local formatStr = string.format
 
-local library = require(game:GetService("ReplicatedStorage").Library)
+local repStore = game:GetService("ReplicatedStorage")
+
+local library = require(repStore.Library)
 local dot3D = library.dot3D
 local cross = library.cross
 local multiplyMatrix = library.multiplyMatrix
 local rotateVertex = library.rotateVertex
 local normalize3D = library.normalize3D
-local createBox = library.createBox
 local computeBarry = library.computeBarry
 
-local WIDTH = 320
-local HEIGHT = 180
+local objectsModule = require(repStore.Objects)
+local insertTestObjects = objectsModule.insertTestObjects
+
+local WIDTH = 240
+local HEIGHT = 135
 
 local HUGE = math.huge
 local HALF_PI = math.pi * 0.5
@@ -29,8 +34,8 @@ local ASPECT_RATIO_INV = 1 / (WIDTH / HEIGHT)
 local pixels = {}
 local zBuffer = {}
 
-local function putPixel(x: number, y: number, color: { number }, l: number)	
-	pixels[x + 1][y + 1].Color = fromRGB(color[1] * l, color[2] * l, color[3] * l)
+local function putPixel(x: number, y: number, color: { number })	
+	pixels[x + 1][y + 1].Color = fromRGB(color[1], color[2], color[3])
 end
 
 local function getTexturePixel(result: { number }, texture: {}, u: number, v: number): { number }
@@ -43,30 +48,10 @@ end
 
 local lightDirection = { -sin(0.79), cos(0.79), 0 }
 
-local function drawTriangle(projected: { { number } }, UVCoords: { { number } }, worldSpace: { { number } }, texture: {}, color: { number })
-	local outBounds = 0
-	local currentVertex
-	
-	for i = 1, 3, 1 do
-		currentVertex = projected[i]
-		
-		if currentVertex[1] < 0 or currentVertex[1] >= WIDTH then
-			outBounds += 1
-			continue
-		end
-		
-		if currentVertex[2] < 0 or currentVertex[2] >= HEIGHT then
-			outBounds += 1
-			continue
-		end
-	end
-	
-	if outBounds == 3 then
-		return
-	end
-	
+local function drawTriangle(projected: { { number } }, UVCoords: { { number } }, worldSpace: { { number } }, texture: {}, color: { number })	
 	local xMin, yMin = projected[1][1], projected[1][2]
 	local xMax, yMax = xMin, yMin
+	local currentVertex
 	
 	for i = 2, 3, 1 do
 		currentVertex = projected[i]
@@ -137,12 +122,12 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 	local barryResult = {}
 	local z
 	local luaX, luaY
+	local texturePixel = {}
 	
 	if texture then
 		local ut, vt
 		local perspectiveCorrectW
 		local perspectiveU, perspectiveV, perspectiveW
-		local texturePixel = {}
 		
 		for y = yMin, yMax, 1 do
 			for x = xMin, xMax, 1 do
@@ -152,8 +137,8 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 					continue
 				end
 				
-				perspectiveCorrectW = 1 / ((barryResult.u * vertex0[3]) + (barryResult.v * vertex1[3]) + (barryResult.w * vertex2[3]))
-				z = (barryResult.u + barryResult.v + barryResult.w) * perspectiveCorrectW
+				perspectiveCorrectW = 1 / ((barryResult[1] * vertex0[3]) + (barryResult[2] * vertex1[3]) + (barryResult[3] * vertex2[3]))
+				z = (barryResult[1] + barryResult[2] + barryResult[3]) * perspectiveCorrectW
 				
 				luaX, luaY = x + 1, y + 1
 				
@@ -163,15 +148,20 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 				
 				zBuffer[luaX][luaY] = z
 				
-				perspectiveU = barryResult.u * vertex0[3]
-				perspectiveV = barryResult.v * vertex1[3]
-				perspectiveW = barryResult.w * vertex2[3]
+				perspectiveU = barryResult[1] * vertex0[3]
+				perspectiveV = barryResult[2] * vertex1[3]
+				perspectiveW = barryResult[3] * vertex2[3]
 
 				ut = ((perspectiveU * UVCoords[1][1]) + (perspectiveV * UVCoords[2][1]) + (perspectiveW * UVCoords[3][1])) * perspectiveCorrectW
 				vt = ((perspectiveU * UVCoords[1][2]) + (perspectiveV * UVCoords[2][2]) + (perspectiveW * UVCoords[3][2])) * perspectiveCorrectW
 				
 				getTexturePixel(texturePixel, texture, ut, vt)
-				putPixel(x, y, texturePixel, lightDot)
+				
+				texturePixel[1] *= lightDot
+				texturePixel[2] *= lightDot
+				texturePixel[3] *= lightDot
+				
+				putPixel(x, y, texturePixel)
 			end
 		end
 		
@@ -186,7 +176,7 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 				continue
 			end
 
-			z = (barryResult.u + barryResult.v + barryResult.w) / ((barryResult.u * vertex0[3]) + (barryResult.v * vertex1[3]) + (barryResult.w * vertex2[3]))
+			z = (barryResult[1] + barryResult[2] + barryResult[3]) / ((barryResult[1] * vertex0[3]) + (barryResult[2] * vertex1[3]) + (barryResult[3] * vertex2[3]))
 
 			luaX, luaY = x + 1, y + 1
 
@@ -195,57 +185,17 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 			end
 
 			zBuffer[luaX][luaY] = z
-
-			putPixel(x, y, color, lightDot)
+			
+			texturePixel[1] = color[1] * lightDot
+			texturePixel[2] = color[2] * lightDot
+			texturePixel[3] = color[3] * lightDot
+			
+			putPixel(x, y, texturePixel)
 		end
 	end
 end
 
-local testTexture = { size = { 10, 10 }, data = nil }
-
-local objects = {}
-
-objects[1] = {
-	verticies = {
-		{ 1, -1, 1 },
-		{ -1, -1, 1 },
-		{ -1, -1, -1 },
-		{ 1, -1, -1 },
-		{ 0, 1, 0 }
-	},
-	position = { 3, 0, -2 },
-	rotation = {
-		{ 1, 0, 0 },
-		{ 0, 1, 0 },
-		{ 0, 0, 1 }
-	},
-	faces = {
-		{ 1, 2, 5, 1, 2, 3 }, -- { vertex0, vertex1, vertex2, uv0, uv1, uv2 }
-		{ 2, 3, 5, 1, 2, 3 },
-		{ 3, 4, 5, 1, 2, 3 },
-		{ 4, 1, 5, 1, 2, 3 },
-		{ 1, 2, 4, 4, 4, 4 },
-		{ 2, 3, 4, 4, 4, 4 }
-	},
-	uv = {
-		{ 1, 1 },
-		{ 0, 1 },
-		{ 0.5, 0 },
-		{ 0, 0 }
-	},
-	texture = testTexture
-}
-
-local camera = {
-	position = { 0, 1.5, 4 },
-	rotation = {
-		{ 1, 0, 0 },
-		{ 0, 1, 0 },
-		{ 0, 0, 1 }
-	}
-}
-
-local function renderObjects() --very important fucntion
+local function renderObjects(objects: {}, camera: {}) --im bout to crash out, I didnt get into triam udom
 	local transposedRotation = { {}, {}, {} }
 	
 	for i = 1, 3, 1 do --transpose camera rotation matrix
@@ -328,140 +278,53 @@ local function renderObjects() --very important fucntion
 	end
 end
 
-local function createBoxWithPosition(position: { number }, size: { number })
-	local box = createBox(size)
-	
-	box.position[1] = position[1]
-	box.position[2] = position[2]
-	box.position[3] = position[3]
-	
-	return box
-end
-
-local function setColor(object: {}, color: { number })
-	object.color[1] = color[1]
-	object.color[2] = color[2]
-	object.color[3] = color[3]
-end
-
 --MAIN
-
-objects[2] = createBox({ 2, 2, 2 })
-objects[2].texture = testTexture
-
---TEST--
-do
-	local skinColor = { 245, 205, 48 }
-	local legColor = { 164, 189, 71 }
-
-	objects[3] = createBoxWithPosition({ 10, 1.5, 0 }, { 1, 1, 1 })
-	setColor(objects[3], skinColor)
-	objects[4] = createBoxWithPosition({ 10, 0, 0 }, { 2, 2, 1 })
-	setColor(objects[4], { 13, 105, 172 })
-	objects[5] = createBoxWithPosition({ 11.5, 0, 0 }, { 1, 2, 1 })
-	setColor(objects[5], skinColor)
-	objects[6] = createBoxWithPosition({ 8.5, 0, 0 }, { 1, 2, 1 })
-	setColor(objects[6], skinColor)
-	objects[7] = createBoxWithPosition({ 10.5, -2, 0 }, { 1, 2, 1 })
-	setColor(objects[7], legColor)
-	objects[8] = createBoxWithPosition({ 9.5, -2, 0 }, { 1, 2, 1 })
-	setColor(objects[8], legColor)
-end
---END--
-
---TEST--
-do
-	local smile = {
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 1, 0, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 1, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-	}
-	
-	testTexture.data = createBuffer(#smile * #smile[1] * 3)
-	
-	local xy
-	
-	for x = 1, testTexture.size[1], 1 do
-		for y = 1, testTexture.size[2], 1 do	
-			if smile[x][y] == 0 then
-				xy = ((x - 1) + ((y - 1) * testTexture.size[1])) * 3
-				writeu8(testTexture.data, xy, 255)
-				writeu8(testTexture.data, xy + 1, 255)
-				writeu8(testTexture.data, xy + 2, 255)
-			end
-		end
-	end
-end
---END--
-
-local pixelFolder = newInstance("Folder")
-
-pixelFolder.Name = "PixelFolder"
-pixelFolder.Parent = workspace
-
-local partSize = newVector(0.5, 0.5, 0.5)
-local part
-
-for x = 1, WIDTH, 1 do
-	pixels[x] = {}
-	zBuffer[x] = {}
-
-	for y = 1, HEIGHT, 1 do
-		part = newInstance("Part")
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.Size = partSize
-		part.Position = newVector(x * 0.5, (HEIGHT - y) * 0.5, 0)
-		part.Parent = pixelFolder
-		part.Name = ""..x..":"..y
-		part.CastShadow = false
-		part.Material = Enum.Material.SmoothPlastic
-		pixels[x][y] = part
-		zBuffer[x][y] = HUGE
-	end
-end
-
-local runService = game:GetService("RunService")
-local player = game:GetService("Players").LocalPlayer
-
-while player.Character == nil do
-	yield()
-end
 
 local userInputService = game:GetService("UserInputService")
 local screenMode = 0
 local workspaceCamera = workspace.Camera
-local z100studs = newVector(0, 0, 100)
+local screenCamZOffset = newVector(0, 0, 75)
+local zKeyDown = false
 
-userInputService.InputBegan:Connect(function(input: InputObject)
-	if input.KeyCode == Enum.KeyCode.Z and userInputService:GetFocusedTextBox() == nil then
-		if screenMode == 0 then
-			workspaceCamera.CameraType = Enum.CameraType.Scriptable
-			workspaceCamera.CFrame = (pixels[round(WIDTH * 0.5)][round(HEIGHT * 0.5)].CFrame) + z100studs
-			userInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-			userInputService.MouseIconEnabled = false
-			screenMode = 1
-		else
-			workspaceCamera.CameraType = Enum.CameraType.Custom
-			userInputService.MouseBehavior = Enum.MouseBehavior.Default
-			userInputService.MouseIconEnabled = true
-			screenMode = 0
+local function checkScreen()	
+	if userInputService:IsKeyDown(Enum.KeyCode.Z) then
+		if not zKeyDown then
+			zKeyDown = true
+
+			if screenMode == 0 then
+				workspaceCamera.CameraType = Enum.CameraType.Scriptable
+				workspaceCamera.CFrame = pixels[1][1].CFrame:Lerp(pixels[WIDTH][HEIGHT].CFrame, 0.5) + screenCamZOffset
+				userInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+				userInputService.MouseIconEnabled = false
+				screenMode = 1
+			else
+				workspaceCamera.CameraType = Enum.CameraType.Custom
+				userInputService.MouseBehavior = Enum.MouseBehavior.Default
+				userInputService.MouseIconEnabled = true
+				screenMode = 0
+			end
 		end
+	else
+		zKeyDown = false
 	end
-end)
+end
+
+local objects = objectsModule.objects
+
+local camera = {
+	position = { 0, 1.5, 4 },
+	rotation = {
+		{ 1, 0, 0 },
+		{ 0, 1, 0 },
+		{ 0, 0, 1 }
+	}
+}
 
 local blackColor = fromRGB(0, 0, 0)
 local angleX, angleY = 0, 0
+local deltaTime
 
-runService.RenderStepped:Connect(function(deltaTime: number)
+local function mainLoop()
 	for x = 1, WIDTH, 1 do --clear screen
 		for y = 1, HEIGHT, 1 do
 			pixels[x][y].Color = blackColor
@@ -519,12 +382,12 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 		if normalize3D(moveDirection) == 1 then
 			rotateVertex(moveDirection, camera.rotation)
 
-			local moveDelta
+			local moveDelta = deltaTime
 
 			if userInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-				moveDelta = 2.5 * deltaTime
+				moveDelta *= 4
 			else
-				moveDelta = 5 * deltaTime
+				moveDelta *= 8
 			end
 
 			camera.position[1] += moveDirection[1] * moveDelta
@@ -582,5 +445,51 @@ runService.RenderStepped:Connect(function(deltaTime: number)
 	end
 	--END--
 		
-	renderObjects()
-end)
+	renderObjects(objects, camera)
+end
+
+local pixelFolder = newInstance("Folder")
+
+pixelFolder.Name = "PixelFolder"
+pixelFolder.Parent = workspace
+
+local partSize = newVector(0.5, 0.5, 0.5)
+local part
+
+for x = 1, WIDTH, 1 do
+	pixels[x] = {}
+	zBuffer[x] = {}
+
+	for y = 1, HEIGHT, 1 do
+		part = newInstance("Part")
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.Size = partSize
+		part.Position = newVector(x * 0.5, (HEIGHT - y) * 0.5, 0)
+		part.Parent = pixelFolder
+		part.Name = formatStr("%d:%d", x, y)
+		part.CastShadow = false
+		part.Material = Enum.Material.SmoothPlastic
+		pixels[x][y] = part
+		zBuffer[x][y] = HUGE
+	end
+end
+
+insertTestObjects()
+
+local player = game:GetService("Players").LocalPlayer
+
+while player.Character == nil do
+	yield()
+end
+
+local lastTime = osClock()
+
+while true do
+	yield()
+	deltaTime = osClock() - lastTime
+	lastTime = osClock()
+	checkScreen()
+	mainLoop()
+end
