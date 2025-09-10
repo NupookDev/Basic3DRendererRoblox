@@ -48,81 +48,35 @@ module.normalize3D = function(vec: { number }): number
 	return 1
 end
 
-module.createBox = function(size: { number }): {}
-	local sizeXHalf = size[1] * 0.5
-	local sizeYHalf = size[2] * 0.5
-	local sizeZHalf = size[3] * 0.5
-	
-	return {
-		verticies = {
-			{ sizeXHalf, -sizeYHalf, sizeZHalf },
-			{ -sizeXHalf, -sizeYHalf, sizeZHalf },
-			{ -sizeXHalf, sizeYHalf, sizeZHalf },
-			{ -sizeXHalf, -sizeYHalf, -sizeZHalf },
-			{ -sizeXHalf, sizeYHalf, -sizeZHalf },
-			{ sizeXHalf, -sizeYHalf, -sizeZHalf },
-			{ sizeXHalf, sizeYHalf, -sizeZHalf },
-			{ sizeXHalf, sizeYHalf, sizeZHalf }
-		},
-		position = { 0, 0, 0 },
-		rotation = {
-			{ 1, 0, 0 },
-			{ 0, 1, 0 },
-			{ 0, 0, 1 }
-		},
-		faces = {
-			{ 1, 2, 3, 1, 2, 3 },
-			{ 1, 3, 8, 1, 3, 4 },
-			{ 2, 4, 5, 1, 2, 3 },
-			{ 2, 5, 3, 1, 3, 4 },
-			{ 4, 6, 7, 1, 2, 3 },
-			{ 4, 7, 5, 1, 3, 4 },
-			{ 6, 1, 8, 1, 2, 3 },
-			{ 6, 8, 7, 1, 3, 4 },
-			{ 1, 2, 4, 3, 3, 3 },
-			{ 1, 4, 6, 3, 3, 3 },
-			{ 3, 5, 8, 3, 3, 3 },
-			{ 8, 5, 7, 3, 3, 3 }
-		},
-		uv = {
-			{ 1, 1 },
-			{ 0, 1 },
-			{ 0, 0 },
-			{ 1, 0 }
-		},
-		texture = nil,
-		color = { 255, 255, 255 }
-	}
-end
-
 module.computeBarry = function(result: { number }, matrix: { { number } }): number --echelon form
 	local a, b = matrix[1][1], matrix[1][2]
 	local c, d = matrix[2][1], matrix[2][2]
 	
-	local det = (a * d) - (c * b)
+	local detInv = (a * d) - (c * b)
 	
-	if det == 0 then
+	if detInv == 0 then
 		return 0
 	end
 	
-	local detInv = 1 / det
+	detInv = 1 / detInv
+	
 	local e, f = matrix[1][3], matrix[2][3]
 	
-	result.v = ((a * f) - (c * e)) * detInv
+	result[2] = ((a * f) - (c * e)) * detInv
 	
-	if result.v < 0 then
+	if result[2] < 0 then
 		return 0
 	end
 	
-	result.u = ((d * e) - (b * f)) * detInv
+	result[1] = ((d * e) - (b * f)) * detInv
 	
-	if result.u < 0 then
+	if result[1] < 0 then
 		return 0
 	end
 	
-	result.w = 1 - result.u - result.v
+	result[3] = 1 - result[1] - result[2]
 	
-	if result.w < 0 then
+	if result[3] < 0 then
 		return 0
 	end
 	
