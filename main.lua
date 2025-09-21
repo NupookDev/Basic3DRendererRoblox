@@ -1,7 +1,3 @@
-local game = game
-local workspace = workspace
-local Enum = Enum
-
 local newVector = Vector3.new
 local sin, cos, floor, round = math.sin, math.cos, math.floor, math.round
 local fromRGB = Color3.fromRGB
@@ -30,6 +26,9 @@ local HEIGHT = 135
 local HUGE = math.huge
 local HALF_PI = math.pi * 0.5
 local ASPECT_RATIO_INV = 1 / (WIDTH / HEIGHT)
+
+local NEAR_PLANE_Z = -1
+local INV_NEAR_PLANE_Z = 1 / -NEAR_PLANE_Z
 
 local pixels = {}
 local zBuffer = {}
@@ -195,7 +194,33 @@ local function drawTriangle(projected: { { number } }, UVCoords: { { number } },
 	end
 end
 
-local function renderObjects(objects: {}, camera: {}) --im bout to crash out, I didnt get into triam udom
+local function copyVertex(vertex0: { number }, vertex1: { number })
+	vertex0[1] = vertex1[1]
+	vertex0[2] = vertex1[2]
+	vertex0[3] = vertex1[3]
+end
+
+local function clipToScreenX(x: number, wInv: number)
+	return floor(((x * ASPECT_RATIO_INV * wInv) + 1) * 0.5 * (WIDTH - 1))
+end
+
+local function clipToScreenY(y: number, wInv: number)
+	return floor((1 - (y * wInv)) * 0.5 * (HEIGHT - 1))
+end
+
+local function getNearClippedVertex(result: { number }, resultUV: { number }, vertex0: { number }, vertex1: { number }, uv0: { number }, uv1: { number })
+	local zDist = vertex1[3] - vertex0[3]
+	local t = (NEAR_PLANE_Z - vertex0[3]) / zDist
+	
+	result[1] = clipToScreenX(vertex0[1] + ((vertex1[1] - vertex0[1]) * t), INV_NEAR_PLANE_Z)
+	result[2] = clipToScreenY(vertex0[2] + ((vertex1[2] - vertex0[2]) * t), INV_NEAR_PLANE_Z)
+	result[3] = INV_NEAR_PLANE_Z
+	
+	resultUV[1] = uv0[1] + ((uv1[1] - uv0[1]) * t)
+	resultUV[2] = uv0[2] + ((uv1[2] - uv0[2]) * t)
+end
+
+local function renderObjects(objects: {}, camera: {})
 	local transposedRotation = { {}, {}, {} }
 	
 	for i = 1, 3, 1 do --transpose camera rotation matrix
@@ -206,13 +231,23 @@ local function renderObjects(objects: {}, camera: {}) --im bout to crash out, I 
 	
 	local object	
 	local face
-	local projected = {}
-	local worldSpace = {}
+	local uv
 	local vertex = {}
 	local wInv
-	local projectedPoints = {}
-	local uvPoints = {}
-	local worldSpacePoints = {}
+	
+	local projected = {}
+	local worldSpace = {}
+	local clipspace = {}
+	local inPlane = {}
+	
+	local projectedPoints = { {}, {}, {} }
+	local uvPoints = { {}, {}, {} }
+	local worldSpacePoints = { {}, {}, {} }
+	
+	local outBounds = { {}, {}, {} }
+	local outBoundsCount
+	local inBounds = { {}, {}, {} }
+	local inBoundsCount
 	
 	for i = 1, #objects, 1 do
 		object = objects[i]
@@ -227,45 +262,97 @@ local function renderObjects(objects: {}, camera: {}) --im bout to crash out, I 
 			vertex[2] += object.position[2]
 			vertex[3] += object.position[3]
 			
-			worldSpace[i] = { vertex[1], vertex[2], vertex[3] }
+			if worldSpace[i] == nil then
+				worldSpace[i] = {}
+			end
+			
+			copyVertex(worldSpace[i], vertex)
 			
 			vertex[1] -= camera.position[1]
 			vertex[2] -= camera.position[2]
 			vertex[3] -= camera.position[3]
 			rotateVertex(vertex, transposedRotation)
 			
-			if vertex[3] >= -2 then
-				projected[i] = 0
+			if clipspace[i] == nil then
+				clipspace[i] = {}
+			end
+			
+			copyVertex(clipspace[i], vertex)
+			
+			if projected[i] == nil then
+				projected[i] = {}
+			end
+			
+			if vertex[3] > NEAR_PLANE_Z then
+				inPlane[i] = 0
 				continue
 			end
 			
+			inPlane[i] = 1
+			
 			wInv = 1 / -vertex[3]
 			
-			projected[i] = {
-				floor(((vertex[1] * ASPECT_RATIO_INV * wInv) + 1) * 0.5 * (WIDTH - 1)),
-				floor((1 - (vertex[2] * wInv)) * 0.5 * (HEIGHT - 1)),
-				wInv
-			}
+			projected[i][1] = clipToScreenX(vertex[1], wInv)
+			projected[i][2] = clipToScreenY(vertex[2], wInv)
+			projected[i][3] = wInv
 		end
 		
 		for i = 1, #object.faces, 1 do
 			face = object.faces[i]
+			uv = object.uv
+			outBoundsCount = 0
+			inBoundsCount = 0
 			
-			if projected[face[1]] == 0 or projected[face[2]] == 0 or projected[face[3]] == 0 then
+			for i = 1, 3, 1 do
+				if inPlane[face[i]] == 0 then
+					outBoundsCount += 1
+					outBounds[outBoundsCount].clip = clipspace[face[i]]
+					outBounds[outBoundsCount].uv = uv[face[i + 3]]
+				else
+					inBoundsCount += 1
+					inBounds[inBoundsCount].clip = clipspace[face[i]]
+					inBounds[inBoundsCount].uv = uv[face[i + 3]]
+					inBounds[inBoundsCount].projected = projected[face[i]]
+				end
+			end
+			
+			if outBoundsCount == 3 then
 				continue
 			end
 			
-			projectedPoints[1] = projected[face[1]]
-			projectedPoints[2] = projected[face[2]]
-			projectedPoints[3] = projected[face[3]]
+			for i = 1, 3, 1 do
+				copyVertex(worldSpacePoints[i], worldSpace[face[i]])
+			end
 			
-			uvPoints[1] = object.uv[face[4]]
-			uvPoints[2] = object.uv[face[5]]
-			uvPoints[3] = object.uv[face[6]]
-			
-			worldSpacePoints[1] = worldSpace[face[1]]
-			worldSpacePoints[2] = worldSpace[face[2]]
-			worldSpacePoints[3] = worldSpace[face[3]]
+			if outBoundsCount == 2 then
+				copyVertex(projectedPoints[1], inBounds[1].projected)
+				copyVertex(uvPoints[1], inBounds[1].uv)
+				
+				getNearClippedVertex(projectedPoints[2], uvPoints[2], inBounds[1].clip, outBounds[1].clip, inBounds[1].uv, outBounds[1].uv)
+				getNearClippedVertex(projectedPoints[3], uvPoints[3], inBounds[1].clip, outBounds[2].clip, inBounds[1].uv, outBounds[2].uv)
+			elseif outBoundsCount == 1 then
+				for i = 1, 2, 1 do
+					copyVertex(projectedPoints[i], inBounds[i].projected)
+					copyVertex(uvPoints[i], inBounds[i].uv)
+				end
+				
+				getNearClippedVertex(projectedPoints[3], uvPoints[3], inBounds[1].clip, outBounds[1].clip, inBounds[1].uv, outBounds[1].uv)
+
+				drawTriangle(
+					projectedPoints,
+					uvPoints,
+					worldSpacePoints,
+					object.texture,
+					object.color
+				)
+				
+				getNearClippedVertex(projectedPoints[1], uvPoints[1], inBounds[2].clip, outBounds[1].clip, inBounds[2].uv, outBounds[1].uv)
+			else
+				for i = 1, 3, 1 do
+					copyVertex(projectedPoints[i], projected[face[i]])
+					copyVertex(uvPoints[i], uv[face[i + 3]])
+				end
+			end
 			
 			drawTriangle(
 				projectedPoints,
@@ -283,7 +370,6 @@ end
 local userInputService = game:GetService("UserInputService")
 local screenMode = 0
 local workspaceCamera = workspace.Camera
-local screenCamZOffset = newVector(0, 0, 75)
 local zKeyDown = false
 
 local function checkScreen()	
@@ -293,7 +379,7 @@ local function checkScreen()
 
 			if screenMode == 0 then
 				workspaceCamera.CameraType = Enum.CameraType.Scriptable
-				workspaceCamera.CFrame = pixels[1][1].CFrame:Lerp(pixels[WIDTH][HEIGHT].CFrame, 0.5) + screenCamZOffset
+				workspaceCamera.CFrame = pixels[1][1].CFrame:Lerp(pixels[WIDTH][HEIGHT].CFrame, 0.5) + newVector(0, 0, WIDTH * 0.25)
 				userInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 				userInputService.MouseIconEnabled = false
 				screenMode = 1
