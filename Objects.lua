@@ -1,17 +1,25 @@
 local module = {}
 
-local createBuffer, writeu8 = buffer.create, buffer.writeu8
+export type texture = {
+	size: { number },
+	data: buffer
+}
 
-local imported = game:GetService("ReplicatedStorage").Imported
-local floppa = require(imported.Floppa)
-local koi = require(imported.KoiFish)
-local teddy = require(imported.Teddy)
-
-local testTexture = { size = { 10, 10 }, data = nil }
+export type object = {
+	position: { number },
+	rotation: { { number } },
+	verticies: { { number } },
+	vertexCount: number,	
+	faces: { { number } }, -- { { vertex0, vertex1, vertex2, uv0, uv1, uv2 }, ... }
+	faceCount: number,
+	uv: { { number } },
+	texture: texture,
+	color: { number }
+}
 
 module.objectCount = 1
 
-module.objects = {
+local objects: { object } = {
 	{
 		vertexCount = 5,
 		verticies = {
@@ -29,7 +37,7 @@ module.objects = {
 		},
 		faceCount = 6,
 		faces = {
-			{ 1, 2, 5, 1, 2, 3 }, -- { vertex0, vertex1, vertex2, uv0, uv1, uv2 }
+			{ 1, 2, 5, 1, 2, 3 },
 			{ 2, 3, 5, 1, 2, 3 },
 			{ 3, 4, 5, 1, 2, 3 },
 			{ 4, 1, 5, 1, 2, 3 },
@@ -42,18 +50,65 @@ module.objects = {
 			{ 0.5, 0 },
 			{ 0, 0 }
 		},
-		texture = testTexture
+		texture = nil,
+		color = { 255, 255, 255 }
 	}
 }
 
-local function createBox(position: { number }, size: { number }): {}
+module.objects = objects
+
+function module.insertObject(object: object)
+	module.objectCount += 1
+	module.objects[module.objectCount] = object
+end
+
+function module.insertPyramid(position: { number }, size: { number }): object
+	local sizeXHalf, sizeYHalf, sizeZHalf = size[1] * 0.5, size[2] * 0.5, size[3] * 0.5
+	
+	local pyramid: object = {
+		vertexCount = 5,
+		verticies = {
+			{ sizeXHalf, -sizeYHalf, sizeZHalf },
+			{ -sizeXHalf, -sizeYHalf, sizeZHalf },
+			{ -sizeXHalf, -sizeYHalf, -sizeZHalf },
+			{ sizeXHalf, -sizeYHalf, -sizeZHalf },
+			{ 0, sizeYHalf, 0 }
+		},
+		position = { position[1], position[2], position[3] },
+		rotation = {
+			{ 1, 0, 0 },
+			{ 0, 1, 0 },
+			{ 0, 0, 1 }
+		},
+		faceCount = 6,
+		faces = {
+			{ 1, 2, 5, 1, 2, 3 },
+			{ 2, 3, 5, 1, 2, 3 },
+			{ 3, 4, 5, 1, 2, 3 },
+			{ 4, 1, 5, 1, 2, 3 },
+			{ 1, 2, 4, 4, 4, 4 },
+			{ 2, 3, 4, 4, 4, 4 }
+		},
+		uv = {
+			{ 1, 1 },
+			{ 0, 1 },
+			{ 0.5, 0 },
+			{ 0, 0 }
+		},
+		texture = nil,
+		color = { 255, 255, 255 }
+	}
+	
+	module.insertObject(pyramid)
+	return pyramid
+end
+
+function module.insertBox(position: { number }, size: { number }): object
 	local sizeXHalf = size[1] * 0.5
 	local sizeYHalf = size[2] * 0.5
 	local sizeZHalf = size[3] * 0.5
 	
-	module.objectCount += 1
-	
-	module.objects[module.objectCount] =  {
+	local box: object = {
 		position = { position[1], position[2], position[3] },
 		vertexCount = 8,
 		verticies = {
@@ -96,11 +151,12 @@ local function createBox(position: { number }, size: { number }): {}
 		color = { 255, 255, 255 }
 	}
 	
-	return module.objects[module.objectCount]
+	module.insertObject(box)
+	return box
 end
 
-local function createCone(position: { number }, height: number, baseRadius: number)
-	local cone = {
+function module.insertCone(position: { number }, height: number, baseRadius: number): object
+	local cone: object = {
 		position = { position[1], position[2], position[3] },
 		vertexCount = 3,
 		verticies = {
@@ -147,67 +203,8 @@ local function createCone(position: { number }, height: number, baseRadius: numb
 	cone.faceCount += 1
 	cone.faces[cone.faceCount] = { 2, 3, cone.vertexCount, 1, 1, 1 }
 	
-	module.objectCount += 1
-	module.objects[module.objectCount] = cone
-	
+	module.insertObject(cone)
 	return cone
-end
-
-local function setColor(object: {}, color: { number })
-	object.color[1] = color[1]
-	object.color[2] = color[2]
-	object.color[3] = color[3]
-end
-
-module.insertTestObjects = function()
-	local smile = {
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 1, 0, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 0, 1, 0 },
-		{ 0, 0, 0, 0, 1, 1, 0, 1, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
-		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-	}
-
-	testTexture.data = createBuffer(300)
-
-	for x = 1, testTexture.size[1], 1 do
-		for y = 1, testTexture.size[2], 1 do	
-			if smile[x][y] == 0 then
-				local xy = ((x - 1) + ((y - 1) * testTexture.size[1])) * 3
-				
-				writeu8(testTexture.data, xy, 255)
-				writeu8(testTexture.data, xy + 1, 255)
-				writeu8(testTexture.data, xy + 2, 255)
-			end
-		end
-	end
-	
-	createBox({ 0, 0, 0 }, { 2, 2, 2 }).texture = testTexture
-	
-	local skinColor = { 245, 205, 48 }
-	local legColor = { 164, 189, 71 }
-	
-	setColor(createBox({ 10, 1.5, 0 }, { 1, 1, 1 }), skinColor)
-	setColor(createBox({ 10, 0, 0 }, { 2, 2, 1 }), { 13, 105, 172 })
-	setColor(createBox({ 11.5, 0, 0 }, { 1, 2, 1 }), skinColor)
-	setColor(createBox({ 8.5, 0, 0 }, { 1, 2, 1 }), skinColor)
-	setColor(createBox({ 10.5, -2, 0 }, { 1, 2, 1 }), legColor)
-	setColor(createBox({ 9.5, -2, 0 }, { 1, 2, 1 }), legColor)
-	setColor(createCone({ 5, 0, 5 }, 5, 2), { 255, 255, 0 })
-	
-	module.objectCount += 1
-	module.objects[module.objectCount] = floppa
-	
-	module.objectCount += 1
-	module.objects[module.objectCount] = koi
-	
-	module.objectCount += 1
-	module.objects[module.objectCount] = teddy
 end
 
 return module
