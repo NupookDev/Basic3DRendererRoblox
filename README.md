@@ -1,5 +1,5 @@
-# Basic 3D Render on Roblox
-A 3D software that renders on a grid of parts.
+# Basic 3D Renderer on Roblox
+A 3D renderer that renders on a grid of parts.
 
 ## Controls:
 [Z] &rarr; Enter 3D<br/>
