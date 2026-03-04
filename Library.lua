@@ -6,6 +6,24 @@ function module.copyVertex(vertex0: { number }, vertex1: { number })
 	vertex0[3] = vertex1[3]
 end
 
+function module.addVertex(vertex0: { number }, vertex1: { number })
+	vertex0[1] += vertex1[1]
+	vertex0[2] += vertex1[2]
+	vertex0[3] += vertex1[3]
+end
+
+function module.subtractVertex(vertex0: { number }, vertex1: { number })
+	vertex0[1] -= vertex1[1]
+	vertex0[2] -= vertex1[2]
+	vertex0[3] -= vertex1[3]
+end
+
+function module.scaleVertex(vertex: { number }, scale: number)
+	vertex[1] *= scale
+	vertex[2] *= scale
+	vertex[3] *= scale
+end
+
 function module.dot3D(vertex0: { number }, vertex1: { number }): number
 	return (vertex0[1] * vertex1[1]) + (vertex0[2] * vertex1[2]) + (vertex0[3] * vertex1[3])
 end

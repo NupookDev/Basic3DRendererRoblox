@@ -62,8 +62,18 @@ function module.insertObject(object: object)
 	module.objects[module.objectCount] = object
 end
 
-function module.insertPyramid(position: { number }, size: { number }): object
-	local sizeXHalf, sizeYHalf, sizeZHalf = size[1] * 0.5, size[2] * 0.5, size[3] * 0.5
+function module.removeObject(object: object)
+	for i = 1, module.objectCount, 1 do
+		if module.objects[i] == object then
+			table.remove(module.objects, i)
+			module.objectCount -= 1
+			return
+		end
+	end
+end
+
+function module.insertPyramid(x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number): object
+	local sizeXHalf, sizeYHalf, sizeZHalf = sizeX * 0.5, sizeY * 0.5, sizeZ * 0.5
 	
 	local pyramid: object = {
 		vertexCount = 5,
@@ -74,7 +84,7 @@ function module.insertPyramid(position: { number }, size: { number }): object
 			{ sizeXHalf, -sizeYHalf, -sizeZHalf },
 			{ 0, sizeYHalf, 0 }
 		},
-		position = { position[1], position[2], position[3] },
+		position = { x, y, z },
 		rotation = {
 			{ 1, 0, 0 },
 			{ 0, 1, 0 },
@@ -103,13 +113,13 @@ function module.insertPyramid(position: { number }, size: { number }): object
 	return pyramid
 end
 
-function module.insertBox(position: { number }, size: { number }): object
-	local sizeXHalf = size[1] * 0.5
-	local sizeYHalf = size[2] * 0.5
-	local sizeZHalf = size[3] * 0.5
+function module.insertBox(x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number): object
+	local sizeXHalf = sizeX * 0.5
+	local sizeYHalf = sizeY * 0.5
+	local sizeZHalf = sizeZ * 0.5
 	
 	local box: object = {
-		position = { position[1], position[2], position[3] },
+		position = { x, y, z },
 		vertexCount = 8,
 		verticies = {
 			{ sizeXHalf, -sizeYHalf, sizeZHalf },
@@ -155,9 +165,9 @@ function module.insertBox(position: { number }, size: { number }): object
 	return box
 end
 
-function module.insertCone(position: { number }, height: number, baseRadius: number): object
+function module.insertCone(x: number, y: number, z: number, height: number, baseRadius: number): object
 	local cone: object = {
-		position = { position[1], position[2], position[3] },
+		position = { x, y, z },
 		vertexCount = 3,
 		verticies = {
 			{ 0, 0, 0 },
@@ -180,7 +190,7 @@ function module.insertCone(position: { number }, height: number, baseRadius: num
 	
 	for i = 1, 9, 1 do
 		local x = (lastX * 0.809) - (lastZ * 0.588)
-		local z = (lastX * 0.588) + (lastZ * 0.809)	
+		local z = (lastX * 0.588) + (lastZ * 0.809)
 		
 		lastX = x
 		lastZ = z
@@ -205,6 +215,10 @@ function module.insertCone(position: { number }, height: number, baseRadius: num
 	
 	module.insertObject(cone)
 	return cone
+end
+
+function module.insertCylinder(x: number, y: number, z: number, baseRadius: number, height: number)
+	
 end
 
 return module
