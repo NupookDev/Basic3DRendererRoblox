@@ -37,7 +37,16 @@ local workspaceCamera = workspace.Camera
 local pixels: { { Part } } = {}
 local zBuffer: { { number } } = {}
 
-module.currentCamera = nil
+local currentCamera: camera = {
+	position = { 0, 1.5, 4 },
+	rotation = {
+		{ 1, 0, 0 },
+		{ 0, 1, 0 },
+		{ 0, 0, 1 }
+	}
+}
+
+module.currentCamera = currentCamera
 module.screenMode = module.ScreenMode.ROBLOX
 
 local function getLightDot(vertex0: { number }, vertex1: { number }, vertex2: { number }): number
@@ -287,7 +296,7 @@ local function renderObject(object: objectsModule.object, transposedCamRotation:
 		worldspace[i] = {}
 		library.copyVertex(worldspace[i], vertex)
 
-		library.subtractVertex(vertex, module.currentCamera.position)
+		library.subtractVertex(vertex, currentCamera.position)
 		library.rotateVertex(vertex, transposedCamRotation)
 
 		clipspace[i] = {}
@@ -381,10 +390,6 @@ local function onEnterScreen(actionName: string, inputState: Enum.UserInputState
 end
 
 function module.routine()
-	if module.currentCamera == nil then
-		return
-	end
-	
 	for x = 1, WIDTH, 1 do
 		for y = 1, HEIGHT, 1 do
 			pixels[x][y].Color = Color3.fromRGB(0, 0, 0)
@@ -396,7 +401,7 @@ function module.routine()
 
 	for i = 1, 3, 1 do
 		for j = 1, 3, 1 do
-			transposedCamRotation[i][j] = module.currentCamera.rotation[j][i]
+			transposedCamRotation[i][j] = currentCamera.rotation[j][i]
 		end
 	end
 
@@ -420,10 +425,10 @@ function module.screenToWorldPosition(result: { number }, x: number, y: number):
 	result[2] = ((y / (HEIGHT - 1) * 2) - 1) * -z
 	result[3] = z
 	
-	library.rotateVertex(result, module.currentCamera.rotation)
-	result[1] += module.currentCamera.position[1]
-	result[2] += module.currentCamera.position[2]
-	result[3] += module.currentCamera.position[3]
+	library.rotateVertex(result, currentCamera.rotation)
+	result[1] += currentCamera.position[1]
+	result[2] += currentCamera.position[2]
+	result[3] += currentCamera.position[3]
 	
 	return true
 end
