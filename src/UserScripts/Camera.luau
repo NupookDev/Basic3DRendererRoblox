@@ -59,7 +59,7 @@ function module.handleMovement(deltaTime: number)
 		moveDirection[2] -= 1
 	end
 
-	if library.normalize3D(moveDirection) then
+	if library.normalize3D(moveDirection, moveDirection) then
 		library.rotateVertex(moveDirection, rendering.currentCamera.rotation)
 
 		if userInputService:IsKeyDown(Enum.KeyCode.LeftShift) then

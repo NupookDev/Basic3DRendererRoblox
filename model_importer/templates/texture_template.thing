@@ -1,0 +1,14 @@
+local data: { number } = {\x}
+local b = buffer.create(#data * 3)
+local currentIndex = 0
+
+for i = 1, #data, 1 do
+    for j = 0, 16, 8 do
+        buffer.writeu8(b, currentIndex, bit32.band(bit32.rshift(data[i], j), 0x000000FF))
+        currentIndex += 1
+    end
+end
+
+local texture = { size = { \x, \x }, data = b }
+
+return texture

@@ -28,10 +28,12 @@ function module.dot3D(vertex0: { number }, vertex1: { number }): number
 	return (vertex0[1] * vertex1[1]) + (vertex0[2] * vertex1[2]) + (vertex0[3] * vertex1[3])
 end
 
-function module.cross(result: { number }, vertex0: { number }, vertex1: { number })
-	result[1] = (vertex0[2] * vertex1[3]) - (vertex1[2] * vertex0[3])
-	result[2] = (vertex0[1] * vertex1[3]) - (vertex1[1] * vertex0[3])
-	result[3] = (vertex0[1] * vertex1[2]) - (vertex1[1] * vertex0[2])
+function module.cross(vertex0: { number }, vertex1: { number }): { number }
+	return {
+		(vertex0[2] * vertex1[3]) - (vertex1[2] * vertex0[3]),
+		(vertex0[1] * vertex1[3]) - (vertex1[1] * vertex0[3]),
+		(vertex0[1] * vertex1[2]) - (vertex1[1] * vertex0[2])
+	}
 end
 
 function module.multiplyMatrix(matrix0: { { number } }, matrix1: { { number } })
@@ -52,7 +54,7 @@ function module.rotateVertex(vertex: { number }, rotationMatrix: { { number } })
 	vertex[3] = (x * rotationMatrix[3][1]) + (y * rotationMatrix[3][2]) + (z * rotationMatrix[3][3])
 end
 
-function module.normalize3D(vec: { number }): boolean
+function module.normalize3D(result: { number }, vec: { number }): boolean
 	local magnitudeSquared = (vec[1] * vec[1]) + (vec[2] * vec[2]) + (vec[3] * vec[3])
 	
 	if magnitudeSquared == 0 then
@@ -61,10 +63,9 @@ function module.normalize3D(vec: { number }): boolean
 	
 	local magnitudeInv = 1 / math.sqrt(magnitudeSquared)
 	
-	vec[1] *= magnitudeInv
-	vec[2] *= magnitudeInv
-	vec[3] *= magnitudeInv
-	
+	result[1] = vec[1] * magnitudeInv
+	result[2] = vec[2] * magnitudeInv
+	result[3] = vec[3] * magnitudeInv
 	return true
 end
 

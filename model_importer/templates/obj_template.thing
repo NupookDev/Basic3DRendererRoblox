@@ -1,0 +1,17 @@
+local object = {
+    position = { 0, 0, 0 },
+    rotation = {
+        { 1, 0, 0 },
+        { 0, 1, 0 },
+        { 0, 0, 1 }
+    },
+    texture = nil,
+    color = { 255, 255, 255 },
+    vertexCount = \x,
+    verticies = {\x},
+    uv = {\x},
+    faceCount = \x,
+    faces = {\x}
+}
+
+return object

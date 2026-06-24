@@ -45,10 +45,10 @@ local objects: { object } = {
 			{ 2, 3, 4, 4, 4, 4 }
 		},
 		uv = {
-			{ 1, 1 },
-			{ 0, 1 },
-			{ 0.5, 0 },
-			{ 0, 0 }
+			{ 1, 0 },
+			{ 0, 0 },
+			{ 0.5, 1 },
+			{ 0, 1 }
 		},
 		texture = nil,
 		color = { 255, 255, 255 }
@@ -72,8 +72,8 @@ function module.removeObject(object: object)
 	end
 end
 
-function module.insertPyramid(x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number): object
-	local sizeXHalf, sizeYHalf, sizeZHalf = sizeX * 0.5, sizeY * 0.5, sizeZ * 0.5
+function module.insertPyramid(position: { number }, size: { number }): object
+	local sizeXHalf, sizeYHalf, sizeZHalf = size[1] * 0.5, size[2] * 0.5, size[3] * 0.5
 	
 	local pyramid: object = {
 		vertexCount = 5,
@@ -84,7 +84,7 @@ function module.insertPyramid(x: number, y: number, z: number, sizeX: number, si
 			{ sizeXHalf, -sizeYHalf, -sizeZHalf },
 			{ 0, sizeYHalf, 0 }
 		},
-		position = { x, y, z },
+		position = { position[1], position[2], position[3] },
 		rotation = {
 			{ 1, 0, 0 },
 			{ 0, 1, 0 },
@@ -100,10 +100,10 @@ function module.insertPyramid(x: number, y: number, z: number, sizeX: number, si
 			{ 2, 3, 4, 4, 4, 4 }
 		},
 		uv = {
-			{ 1, 1 },
-			{ 0, 1 },
-			{ 0.5, 0 },
-			{ 0, 0 }
+			{ 1, 0 },
+			{ 0, 0 },
+			{ 0.5, 1 },
+			{ 0, 1 }
 		},
 		texture = nil,
 		color = { 255, 255, 255 }
@@ -113,13 +113,13 @@ function module.insertPyramid(x: number, y: number, z: number, sizeX: number, si
 	return pyramid
 end
 
-function module.insertBox(x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number): object
-	local sizeXHalf = sizeX * 0.5
-	local sizeYHalf = sizeY * 0.5
-	local sizeZHalf = sizeZ * 0.5
+function module.insertBox(position: { number }, size: { number }): object
+	local sizeXHalf = size[1] * 0.5
+	local sizeYHalf = size[2] * 0.5
+	local sizeZHalf = size[3] * 0.5
 	
 	local box: object = {
-		position = { x, y, z },
+		position = { position[1], position[2], position[3] },
 		vertexCount = 8,
 		verticies = {
 			{ sizeXHalf, -sizeYHalf, sizeZHalf },
@@ -152,10 +152,10 @@ function module.insertBox(x: number, y: number, z: number, sizeX: number, sizeY:
 			{ 8, 5, 7, 3, 3, 3 }
 		},
 		uv = {
-			{ 1, 1 },
-			{ 0, 1 },
+			{ 1, 0 },
 			{ 0, 0 },
-			{ 1, 0 }
+			{ 0, 1 },
+			{ 1, 1 }
 		},
 		texture = nil,
 		color = { 255, 255, 255 }
@@ -165,9 +165,9 @@ function module.insertBox(x: number, y: number, z: number, sizeX: number, sizeY:
 	return box
 end
 
-function module.insertCone(x: number, y: number, z: number, height: number, baseRadius: number): object
+function module.insertCone(position: { number }, height: number, baseRadius: number): object
 	local cone: object = {
-		position = { x, y, z },
+		position = { position[1], position[2], position[3] },
 		vertexCount = 3,
 		verticies = {
 			{ 0, 0, 0 },
@@ -215,10 +215,6 @@ function module.insertCone(x: number, y: number, z: number, height: number, base
 	
 	module.insertObject(cone)
 	return cone
-end
-
-function module.insertCylinder(x: number, y: number, z: number, baseRadius: number, height: number)
-	
 end
 
 return module

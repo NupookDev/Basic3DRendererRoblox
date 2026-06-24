@@ -46,22 +46,23 @@ local currentCamera: camera = {
 	}
 }
 
+local transposedCamRotation: { { number } } = {
+	{ 1, 0, 0 },
+	{ 0, 1, 0 },
+	{ 0, 0, 1 }
+}
+
 module.currentCamera = currentCamera
 module.screenMode = module.ScreenMode.ROBLOX
 
-local function getLightDot(vertex0: { number }, vertex1: { number }, vertex2: { number }): number
-	local crossProduct: { number } = {}
-	
-	local direction0: { number } = { vertex1[1] - vertex0[1], vertex1[2] - vertex0[2], vertex1[3] - vertex0[3] }
-	local direction1: { number } = { vertex2[1] - vertex0[1], vertex2[2] - vertex0[2], vertex2[3] - vertex0[3] }
-	library.cross(crossProduct, direction0, direction1)
+local function getLightDot(vertex0: { number }, vertex1: { number }, vertex2: { number }): number	
+	local crossProduct = library.cross({ vertex1[1] - vertex0[1], vertex1[2] - vertex0[2], vertex1[3] - vertex0[3] }, { vertex2[1] - vertex0[1], vertex2[2] - vertex0[2], vertex2[3] - vertex0[3] })
 
-	if not library.normalize3D(crossProduct) then
+	if not library.normalize3D(crossProduct, crossProduct) then
 		return 0
 	end
 	
-	local lightDirection: { number } = { -0.7103532724176078, 0.7038453156522361, 0 }
-	local lightDot = library.dot3D(crossProduct, lightDirection)
+	local lightDot = library.dot3D(crossProduct, { -0.7103532724176078, 0.7038453156522361, 0 })
 
 	if lightDot < 0 then
 		lightDot = -lightDot
@@ -75,12 +76,14 @@ local function putPixel(x: number, y: number, color: { number })
 	pixels[x + 1][y + 1].Color = Color3.fromRGB(color[1], color[2], color[3])
 end
 
-local function getTexturePixel(result: { number }, texture: objectsModule.texture, u: number, v: number): { number }
-	local xy = (math.round(u * (texture.size[1] - 1)) + (math.round(v * (texture.size[2] - 1)) * texture.size[1])) * 3
-
-	result[1] = buffer.readu8(texture.data, xy)
-	result[2] = buffer.readu8(texture.data, xy + 1)
-	result[3] = buffer.readu8(texture.data, xy + 2)
+local function getTexturePixel(texture: objectsModule.texture, u: number, v: number): { number }
+	local xy = (math.round(u * (texture.size[1] - 1)) + (math.round((1 - v) * (texture.size[2] - 1)) * texture.size[1])) * 3
+	
+	return {
+		buffer.readu8(texture.data, xy),
+		buffer.readu8(texture.data, xy + 1),
+		buffer.readu8(texture.data, xy + 2)
+	}
 end
 
 --[[
@@ -179,8 +182,12 @@ local function drawTriangle(projected: { { number } }, uvCoords: { { number } },
 				if not solveBarry(barryResult, barryMatrix) then
 					continue
 				end
-
-				local perspectiveCorrectW = 1 / ((barryResult[1] * projected0[3]) + (barryResult[2] * projected1[3]) + (barryResult[3] * projected2[3]))
+				
+				local perspectiveU = barryResult[1] * projected0[3]
+				local perspectiveV = barryResult[2] * projected1[3]
+				local perspectiveW = barryResult[3] * projected2[3]
+				
+				local perspectiveCorrectW = 1 / (perspectiveU + perspectiveV + perspectiveW)
 				local correctZ = -perspectiveCorrectW
 				local luaX, luaY = x + 1, y + 1
 
@@ -190,18 +197,11 @@ local function drawTriangle(projected: { { number } }, uvCoords: { { number } },
 
 				zBuffer[luaX][luaY] = correctZ
 
-				local perspectiveU = barryResult[1] * projected0[3]
-				local perspectiveV = barryResult[2] * projected1[3]
-				local perspectiveW = barryResult[3] * projected2[3]
-				
 				local ut = ((perspectiveU * uvCoords[1][1]) + (perspectiveV * uvCoords[2][1]) + (perspectiveW * uvCoords[3][1])) * perspectiveCorrectW
 				local vt = ((perspectiveU * uvCoords[1][2]) + (perspectiveV * uvCoords[2][2]) + (perspectiveW * uvCoords[3][2])) * perspectiveCorrectW
 				
-				local texturePixel: { number } = {}
-				
-				getTexturePixel(texturePixel, texture, ut, vt)
+				local texturePixel: { number } = getTexturePixel(texture, ut, vt)
 				library.scaleVertex(texturePixel, lightDot)
-				
 				putPixel(x, y, texturePixel)
 			end
 		end
@@ -232,7 +232,6 @@ local function drawTriangle(projected: { { number } }, uvCoords: { { number } },
 			local colorPixel: { number } = {}
 			library.copyVertex(colorPixel, color)
 			library.scaleVertex(colorPixel, lightDot)
-			
 			putPixel(x, y, colorPixel)
 		end
 	end
@@ -281,7 +280,7 @@ local function handleVertexBounding(inBounds: { inBoundData }, outBounds: { outB
 	return outBoundsCount
 end
 
-local function renderObject(object: objectsModule.object, transposedCamRotation: { { number } })
+local function renderObject(object: objectsModule.object)
 	local worldspace: { { number } } = {}
 	local clipspace: { { number } } = {}
 	local projected: { { number } } = {}
@@ -396,8 +395,6 @@ function module.routine()
 			zBuffer[x][y] = -math.huge
 		end
 	end
-	
-	local transposedCamRotation: { { number } } = { {}, {}, {} }
 
 	for i = 1, 3, 1 do
 		for j = 1, 3, 1 do
@@ -406,7 +403,7 @@ function module.routine()
 	end
 
 	for i = 1, objectsModule.objectCount, 1 do
-		renderObject(objectsModule.objects[i], transposedCamRotation)
+		renderObject(objectsModule.objects[i])
 	end
 end
 
